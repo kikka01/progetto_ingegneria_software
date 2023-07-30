@@ -95,3 +95,5 @@ def end(update, context):
     chat_id = update.effective_chat.id
     update.message.reply_text("end")
     print("end called from chat with id = {}".format(chat_id))
+
+print("prova1")
