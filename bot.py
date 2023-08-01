@@ -94,19 +94,61 @@ LINK = "https://www.dmi.unipg.it/dipartimento/rubrica?categoria=DOC&lettera=&pag
 def end(update, context):
     chat_id = update.effective_chat.id
     update.message.reply_text("end")
-    print("end called from chat with id = {}".format(chat_id))"""
+    print("end called from chat with id = {}".format(chat_id))
+
+PUO SERVIRE 
+update.message.reply_text(
+        f"Ciao, {user.first_name}! Benvenuto nel bot.\n"
+        "Scegli un'opzione:",
+        reply_markup={
+            "keyboard": [["Opzione 1"], ["Opzione 2"]],
+            "one_time_keyboard": True,
+            "resize_keyboard": True,
+        },
+    )
+    
+"""
 
 from typing import final
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes,Updater , CallbackQueryHandler, CallbackContext
+import random
+
+
 
 print('Starting up bot...')
 
 TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
 BOT_USERNAME : final = "@consegna_compito_unipg_bot"
 
+# Dizionario per tenere traccia degli utenti che hanno già premuto il pulsante
+users_pressed_button = {}
+
+# funzioni utili
+def get_user_id(update: Update):
+    user_id = update.effective_user.id
+    return user_id 
+
+def remove_spaces(input_string):
+    return "".join(input_string.split())
+
+def random_with_50_percent_probability():
+    return random.random() < 0.5
+
 # commands
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_command(update: Update, context: CallbackContext):
+    user = update.effective_user
+    user_id = get_user_id(update)
+    users_pressed_button[user_id] = False  # Impostiamo l'utente come non ha ancora premuto il pulsante
+    await update.message.reply_text(
+        f"Ciao, {user.first_name}!\n"
+        "Scegli un'opzione:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("Studente", callback_data="opzione_1")],
+            [InlineKeyboardButton("Professore", callback_data="opzione_2")],
+        ]),
+    )
+    """
     start_msg = "Benvenuto a", BOT_USERNAME,".\n"\
 	"- Se sei uno STUDENTE, questo bot ti permetterà di visualizzare l\'elenco dei docenti. \n"\
         "Ti permetterà inoltre di consegnare al proprio docente le foto della prova scritta. \n\n"\
@@ -114,6 +156,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Ti permetterà inoltre di visualizzare le foto caricate dagli studenti nel giorno corrente. \n\n"\
         "Per visualizzare i comandi disponibili utilizza /help\n\n"
     await update.message.reply_text(start_msg)
+    """
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_msg = "Ecco una lista dei *comandi* attualmente disponibili su questo bot:\n\n"\
@@ -125,29 +168,55 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "- /end: Interrompe il comando attualmente in esecuzione\n"
     await update.message.reply_text(help_msg)
 
-async def lista_docenti_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def lista_docenti_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
     await update.message.reply_text('Non faccio nulla ancora')
 
-async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof 
     await update.message.reply_text('Non faccio nulla ancora')
 
 async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Non faccio nulla ancora')
 
-def handle_response(text: str) -> str:
+#Funzioni
 
+# Funzione di gestione del callback dei pulsanti inline
+async def handle_button(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    if not users_pressed_button.get(user_id, False):
+        option_selected = query.data
+
+        if option_selected == "opzione_1":
+            await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Studente. Scrivmi il tuo ID.")
+        elif option_selected == "opzione_2":
+            await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Professore. Scrivmi il tuo ID.")
+        else:
+            await query.answer("Opzione non valida.")
+        # Imposta l'utente come ha premuto il pulsante
+        users_pressed_button[user_id] = True
+    else:
+        await query.answer("Hai già premuto il pulsante.")
+
+#funzioni risposta ai messaggi
+def handle_response_int(text: int,update: Update) -> str:
+    #processed: str = text.lower()
+    user_id = get_user_id(update)
+    if users_pressed_button.get(user_id, False):
+        if (len(text) == 6):
+            result = random_with_50_percent_probability()
+
+            if(result):
+                return 'ID accettato'
+            else:
+                return 'risposta non accettata'
+    else:
+        return 'scegli studente o professore'
+    
+def handle_response(text: str,update: Update) -> str:
     processed: str = text.lower()
 
-    if 'professore' in processed:
-        return 'scrivmi il tuo id'
-
-    if 'prof' in processed:
-        return 'scrivmi il tuo id'
-
-    if 'studente' in processed:
-        return 'scrivmi il tuo id'
-
-    return 'risposta non accettata'
+    return 'testo non accettato'
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -157,8 +226,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # utile per debugging
     print(f'User ({update.message.chat.id}) in {message_type}: "{text}"')
-
-    response: str = handle_response(text)
+    digit = remove_spaces(text)
+    if digit.isdigit():
+        response: str = handle_response_int(int(digit),update)
+    else:
+        response: str = handle_response(text,update)
 
     # Reply normal if the message is in private
     print('Bot:', response)
@@ -183,7 +255,8 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('leggi', leggi_command))
 
     # Messages
-    app.add_handler(MessageHandler(filters.TEXT, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT , handle_message))
+    app.add_handler(CallbackQueryHandler(handle_button))
 
     # Log all errors
     app.add_error_handler(error)
@@ -192,4 +265,4 @@ if __name__ == '__main__':
     # Run the bot
     app.run_polling(poll_interval=3)
 
-print("prova1")
+print("terminato")
