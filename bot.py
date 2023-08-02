@@ -113,16 +113,49 @@ from typing import final
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes,Updater , CallbackQueryHandler, CallbackContext
 import random
-
+import requests
+from bs4 import BeautifulSoup
 
 
 print('Starting up bot...')
 
 TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
 BOT_USERNAME : final = "@consegna_compito_unipg_bot"
+LINK : final = "https://www.dmi.unipg.it/dipartimento/aule"
+HEADERS : final = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+}
 
 # Dizionario per tenere traccia degli utenti che hanno già premuto il pulsante
 users_pressed_button = {}
+
+#funzione per scaricare la pagina web
+def get_html_content(url):
+    response = requests.get(url, headers=HEADERS)
+    print(response.text)
+    if response.status_code == 200:
+        return response.content
+    else:
+        print("Errore nella request, codice:",response.status_code)
+    
+
+#funzione per analizzare la pagina
+def extract_names_html(html_content):
+    soup = BeautifulSoup(html_content, "html.parser")
+    table = soup.find("table", class_="table table-striped table-condensed")
+    rows = table.find_all("tr")
+    #correggere in modo che row accetti find_all("td") come metodo oppure trovare altro metodo
+    for row in rows:
+        cells = soup.row.find_all("td")
+        if cells:
+            name = cells[0].text.strip()
+    names = []
+    td_elements = soup.find_all('td')
+    for td in td_elements:
+        name = td.get_text().strip()
+        names.append(name)
+        #print(name)
+    return names
 
 # funzioni utili
 def get_user_id(update: Update):
@@ -169,7 +202,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_msg)
 
 async def lista_docenti_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
-    await update.message.reply_text('Non faccio nulla ancora')
+    html_content = get_html_content(LINK)# Ottieni il contenuto HTML
+    names = extract_names_html(html_content)# Analizza il contenuto con Beautiful Soup
+    await update.message.reply_text(names)
 
 async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof 
     await update.message.reply_text('Non faccio nulla ancora')
@@ -244,6 +279,7 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Run the program
 if __name__ == '__main__':
+
     app = Application.builder().token(TOKEN).build()
 
     # Commands
