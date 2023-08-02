@@ -110,6 +110,7 @@ update.message.reply_text(
 """
 
 from typing import final
+from urllib.parse import urljoin
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes,Updater , CallbackQueryHandler, CallbackContext
 import random
@@ -132,9 +133,9 @@ users_pressed_button = {}
 #funzione per scaricare la pagina web
 def get_html_content(url):
     response = requests.get(url, headers=HEADERS)
-    print(response.text)
+    # print(response.text)
     if response.status_code == 200:
-        return response.content
+        return response.text
     else:
         print("Errore nella request, codice:",response.status_code)
     
@@ -142,20 +143,39 @@ def get_html_content(url):
 #funzione per analizzare la pagina
 def extract_names_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
-    table = soup.find("table", class_="table table-striped table-condensed")
+
+    iframe = soup.find("iframe")
+    
+    iframe_url = urljoin(LINK, iframe["src"])
+    iframe_html = get_html_content(iframe_url)
+    iframe_soup = BeautifulSoup(iframe_html, "html.parser")
+
+    table = iframe_soup.find("table", class_="table table-striped table-condensed") #trovo la tabella con la classe "table table-striped table-condensed"
     rows = table.find_all("tr")
-    #correggere in modo che row accetti find_all("td") come metodo oppure trovare altro metodo
-    for row in rows:
-        cells = soup.row.find_all("td")
-        if cells:
-            name = cells[0].text.strip()
-    names = []
-    td_elements = soup.find_all('td')
-    for td in td_elements:
-        name = td.get_text().strip()
-        names.append(name)
-        #print(name)
-    return names
+    print(rows)
+
+    # values = []
+    # for row in rows[0:6]:
+    #     row_values = [value.get_text(strip=True) for value in row.find_all("td")]
+    #     if any(row_values):
+    #         values.append(row_values)
+
+    # values = [row for row in values if any(row[1:])]
+    # docenti_array = []
+
+    # for row in values:
+    #     for value in row[1:]:
+    #         docenti_array.append(value)
+
+    #table_string = f"Data: {div}\n\n"
+    table_string = "Elenco del personale\n\n"
+    # for row in values:
+    #     #row_string = "\n".join([f"{header}: {value}" for header, value in zip(headers, row)])
+    #     row_string = "\n".join([f"{value}" for value in zip(row)])
+    #     table_string += f"{row_string}\n\n"
+    print(table_string)
+
+    return table_string
 
 # funzioni utili
 def get_user_id(update: Update):
