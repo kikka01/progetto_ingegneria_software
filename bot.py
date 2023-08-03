@@ -120,10 +120,8 @@ from bs4 import BeautifulSoup
 
 print('Starting up bot...')
 
-#TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
-#BOT_USERNAME : final = "@consegna_compito_unipg_bot"
-TOKEN : final = "6370580588:AAGKKqCgMAtPduC4Nb63IzwPepFycdkvn8w"
-BOT_USERNAME : final = "@consegna_compito_bot"
+TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
+BOT_USERNAME : final = "@consegna_compito_unipg_bot"
 LINK : final = "https://www.dmi.unipg.it/dipartimento/rubrica?categoria=DOC&lettera=&pagina="
 HEADERS : final = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
