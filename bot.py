@@ -120,9 +120,11 @@ from bs4 import BeautifulSoup
 
 print('Starting up bot...')
 
-TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
-BOT_USERNAME : final = "@consegna_compito_unipg_bot"
-LINK : final = "https://www.dmi.unipg.it/dipartimento/aule"
+#TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
+#BOT_USERNAME : final = "@consegna_compito_unipg_bot"
+TOKEN : final = "6370580588:AAGKKqCgMAtPduC4Nb63IzwPepFycdkvn8w"
+BOT_USERNAME : final = "@consegna_compito_bot"
+LINK : final = "https://www.dmi.unipg.it/dipartimento/rubrica?categoria=DOC&lettera=&pagina="
 HEADERS : final = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
 }
@@ -131,8 +133,8 @@ HEADERS : final = {
 users_pressed_button = {}
 
 #funzione per scaricare la pagina web
-def get_html_content(url):
-    response = requests.get(url, headers=HEADERS)
+def get_html_content(LINK):
+    response = requests.get(LINK, headers=HEADERS)
     # print(response.text)
     if response.status_code == 200:
         return response.text
@@ -144,36 +146,33 @@ def get_html_content(url):
 def extract_names_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
 
-    iframe = soup.find("iframe")
+    #iframe = soup.find("iframe")
     
-    iframe_url = urljoin(LINK, iframe["src"])
-    iframe_html = get_html_content(iframe_url)
-    iframe_soup = BeautifulSoup(iframe_html, "html.parser")
+    #iframe_url = urljoin(LINK, iframe["src"])
+    #iframe_html = get_html_content(iframe_url)
+    #iframe_soup = BeautifulSoup(iframe_html, "html.parser")
 
-    table = iframe_soup.find("table", class_="table table-striped table-condensed") #trovo la tabella con la classe "table table-striped table-condensed"
+    table = soup.find("table", class_="table table-striped table-condensed") #trovo la tabella con la classe "table table-striped table-condensed"
     rows = table.find_all("tr")
-    print(rows)
 
-    # values = []
-    # for row in rows[0:6]:
-    #     row_values = [value.get_text(strip=True) for value in row.find_all("td")]
-    #     if any(row_values):
-    #         values.append(row_values)
+    values = []
+    for row in rows[0:6]:
+        row_values = [value.get_text(strip=True) for value in row.find_all("td")]
+        if any(row_values):
+            values.append(row_values)
 
-    # values = [row for row in values if any(row[1:])]
-    # docenti_array = []
+    values = [row for row in values if any(row[1:])]
+    docenti_array = []
 
-    # for row in values:
-    #     for value in row[1:]:
-    #         docenti_array.append(value)
+    for row in values:
+        for value in row[1:]:
+            docenti_array.append(value)
 
-    #table_string = f"Data: {div}\n\n"
     table_string = "Elenco del personale\n\n"
-    # for row in values:
-    #     #row_string = "\n".join([f"{header}: {value}" for header, value in zip(headers, row)])
-    #     row_string = "\n".join([f"{value}" for value in zip(row)])
-    #     table_string += f"{row_string}\n\n"
-    print(table_string)
+    for row in values:
+        #row_string = "\n".join([f"{header}: {value}" for header, value in zip(headers, row)])
+        row_string = "\n".join([f"{value}" for value in zip(row)])
+        table_string += f"{row_string}\n\n"
 
     return table_string
 
@@ -225,11 +224,18 @@ async def lista_docenti_command(update: Update, context: ContextTypes.DEFAULT_TY
     html_content = get_html_content(LINK)# Ottieni il contenuto HTML
     names = extract_names_html(html_content)# Analizza il contenuto con Beautiful Soup
     await update.message.reply_text(names)
+    #bot.send_message(message.chat.id, table_string)
 
-async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof 
+async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
     await update.message.reply_text('Non faccio nulla ancora')
 
-async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def consegne_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
+    await update.message.reply_text('Non faccio nulla ancora')
+
+async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
+    await update.message.reply_text('Non faccio nulla ancora')
+
+async def end_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Non faccio nulla ancora')
 
 #Funzioni
