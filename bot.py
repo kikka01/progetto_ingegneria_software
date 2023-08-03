@@ -116,12 +116,15 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import random
 import requests
 from bs4 import BeautifulSoup
+import re
 
 
 print('Starting up bot...')
 
 TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
 BOT_USERNAME : final = "@consegna_compito_unipg_bot"
+#TOKEN : final = "6370580588:AAGKKqCgMAtPduC4Nb63IzwPepFycdkvn8w"
+#BOT_USERNAME : final = "@consegna_compito_bot"
 LINK : final = "https://www.dmi.unipg.it/dipartimento/rubrica?categoria=DOC&lettera=&pagina="
 HEADERS : final = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
@@ -139,7 +142,7 @@ def get_html_content(LINK):
     else:
         print("Errore nella request, codice:",response.status_code)
     
-
+'''
 #funzione per analizzare la pagina
 def extract_names_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
@@ -155,9 +158,10 @@ def extract_names_html(html_content):
 
     values = []
     for row in rows[0:6]:
-        row_values = [value.get_text(strip=True) for value in row.find_all("td")]
+        row_values = [value.get_text(strip=True) for value in row.find_all("td")] #lista che contiene i testi dei tag <td> (colonne) presenti nella riga corrente della tabella
         if any(row_values):
-            values.append(row_values)
+            #print(row_values[0])
+            values.append(row_values[0])
 
     values = [row for row in values if any(row[1:])]
     docenti_array = []
@@ -173,6 +177,7 @@ def extract_names_html(html_content):
         table_string += f"{row_string}\n\n"
 
     return table_string
+'''
 
 # funzioni utili
 def get_user_id(update: Update):
@@ -220,9 +225,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def lista_docenti_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
     html_content = get_html_content(LINK)# Ottieni il contenuto HTML
-    names = extract_names_html(html_content)# Analizza il contenuto con Beautiful Soup
-    await update.message.reply_text(names)
+    #names = extract_names_html(html_content)# Analizza il contenuto con Beautiful Soup
+    #await update.message.reply_text(names)
     #bot.send_message(message.chat.id, table_string)
+    
+    soup = BeautifulSoup(html_content, "html.parser")
+    table = soup.find("table", class_="table table-striped table-condensed") #trovo la tabella con la classe "table table-striped table-condensed"
+    rows = table.find_all("tr")
+    
+    for row in rows[0:]:
+        row_values = [value.get_text(strip=True) for value in row.find_all("td")] #lista che contiene i testi dei tag <td> (colonne) presenti nella riga corrente della tabella
+        if any(row_values):
+            await update.message.reply_text(row_values[0])
+
 
 async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
     await update.message.reply_text('Non faccio nulla ancora')
