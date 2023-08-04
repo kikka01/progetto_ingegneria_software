@@ -147,12 +147,6 @@ def get_html_content(LINK):
 def extract_names_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
 
-    #iframe = soup.find("iframe")
-    
-    #iframe_url = urljoin(LINK, iframe["src"])
-    #iframe_html = get_html_content(iframe_url)
-    #iframe_soup = BeautifulSoup(iframe_html, "html.parser")
-
     table = soup.find("table", class_="table table-striped table-condensed") #trovo la tabella con la classe "table table-striped table-condensed"
     rows = table.find_all("tr")
 
@@ -227,15 +221,15 @@ async def lista_docenti_command(update: Update, context: ContextTypes.DEFAULT_TY
     html_content = get_html_content(LINK)# Ottieni il contenuto HTML
     #names = extract_names_html(html_content)# Analizza il contenuto con Beautiful Soup
     #await update.message.reply_text(names)
-    #bot.send_message(message.chat.id, table_string)
-    
+
     soup = BeautifulSoup(html_content, "html.parser")
     table = soup.find("table", class_="table table-striped table-condensed") #trovo la tabella con la classe "table table-striped table-condensed"
     rows = table.find_all("tr")
-    
+    names = []
     for row in rows[0:]:
         row_values = [value.get_text(strip=True) for value in row.find_all("td")] #lista che contiene i testi dei tag <td> (colonne) presenti nella riga corrente della tabella
         if any(row_values):
+            names.append(row_values[0])
             await update.message.reply_text(row_values[0])
 
 
