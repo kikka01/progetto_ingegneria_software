@@ -89,13 +89,6 @@ LINK = "https://www.dmi.unipg.it/dipartimento/rubrica?categoria=DOC&lettera=&pag
 # e invia o rendi scaricabile la foto al docente.
 
 
-# Gestore del comando /end
-# Studenti e docenti possono utilizzare il comando /end per terminare il bot.
-def end(update, context):
-    chat_id = update.effective_chat.id
-    update.message.reply_text("end")
-    print("end called from chat with id = {}".format(chat_id))
-
 PUO SERVIRE 
 update.message.reply_text(
         f"Ciao, {user.first_name}! Benvenuto nel bot.\n"
@@ -117,6 +110,7 @@ import random
 import requests
 from bs4 import BeautifulSoup
 import re
+import sqlite3
 
 
 print('Starting up bot...')
@@ -173,6 +167,84 @@ def extract_names_html(html_content):
     return table_string
 '''
 
+################################################################################
+
+# PROVA DATABASE
+
+# Connessione al database
+connection = sqlite3.connect('database.db')
+cursor = connection.cursor()  # Ottieni il cursore per eseguire le query
+
+
+# Creazione della tabella "studenti_e_password" nel database con due campi: ID_studente, password_studente
+tab1 = "create table studenti_e_password (" 
+       "ID_studente primary key int not null," \
+       "password_studente char(3) not null);"
+connection.execute(tab1)  # creazione della tabella vuota
+
+# Inserimento di dati (righe) nella tabella studenti_e_password
+item1 = [331332, 'abc']  #array con i dati che voglio inserire
+cursor.execute('insert into studenti_e_password values (?,?);', item1) #ID_studente, password_studente
+connection.commit()  #conferma i dati e li scrive nel database
+
+item2 = [330350, 'def']
+cursor.execute('insert into studenti_e_password values (?,?);', item2)
+connection.commit()  #conferma i dati e li scrive nel database
+
+
+# Creazione della tabella "docenti_e_password" nel database con due campi: ID_docente, password_docente
+tab2 = "create table docenti_e_password (" 
+       "ID_docente primary key varchar(30) not null," \
+       "password_docente int not null);"
+connection.execute(tab2)  # creazione della tabella vuota
+
+# Inserimento di dati (righe) nella tabella docenti_e_password
+item = []
+for i in range(0,len(names)-1):
+    item = [names[i],i]
+    cursor.execute('insert into docenti_e_password values (?,?);', item) #ID_docente, password_docente
+    connection.commit() #conferma i dati e li scrive nel database
+
+
+# Creazione della tabella "compiti_consegnati" nel database con quattro campi: code_foto, ID_studente, ID_docente, data_ora
+tab3 = "create table compiti_consegnati (" 
+       "code_foto int primary key not null," \
+       "ID_studente int not null," \
+       "ID_docente varchar(30) not null," \
+       "data_e_ora varchar(20) not null);"
+connection.execute(tab3)  # creazione della tabella vuota
+
+# Inserimento di dati (righe) nella tabella compiti_consegnati
+current_date = datetime.now()
+formatted_date_time = current_date.strftime("%Y-%m-%d %H:%M:%S") #es. "2023-07-29 15:30:45"
+
+item = []  #array con i dati che voglio inserire
+# Riempo item con i nuovi dati da aggiungere
+#item[0] = ?? #code_foto (con numpy)
+#item[1] = ?? #ID_studente
+#item[2] = ?? #ID_docente
+item[3] = formatted_date_time #data_e_ora
+cursor.execute('insert into compiti_consegnati values (?,?,?,?);', item) #code_foto, ID_studente, ID_docente, data_e_ora
+connection.commit()  #conferma i dati e li scrive nel database
+
+
+# Lettura (query) della tabella compiti_consegnati
+cursor.execute("select * from compiti_consegnati") #DA INSERIRE FILTRI
+# esempi filtri:
+# cursor.execute("select * from compiti_consegnati where ID_studente == 331332")
+for row in cursor.fetchall(): #fetchall = tutte le righe estratte
+    print("({}) studente {} consegna a docente {}, in data {}".format(row[0], row[1], row[2], row[3]))
+    #formattazione: segnaposto={}
+    #row = struttura (array) con i dati che vengono estratti da ogni riga
+
+
+# Chiusura di connessione e cursore del database
+cursor.close()
+connection.close()
+
+
+#################################################################################
+
 # funzioni utili
 def get_user_id(update: Update):
     user_id = update.effective_user.id
@@ -213,8 +285,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "- /lista_docenti: Visualizza l\'elenco dei docenti e i loro ID\n"\
         "- /consegna ID_docente: Permette il caricamento delle foto della prova scritta per la consegna al docente\n"\
         "- /consegne: Visualizza gli ID degli studenti che hanno effettuato consegne nel giorno corrente\n"\
-        "- /leggi ID_studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"\
-        "- /end: Interrompe il comando attualmente in esecuzione\n"
+        "- /leggi ID_studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"
     await update.message.reply_text(help_msg)
 
 async def lista_docenti_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
@@ -242,8 +313,6 @@ async def consegne_command(update: Update, context: ContextTypes.DEFAULT_TYPE): 
 async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
     await update.message.reply_text('Non faccio nulla ancora')
 
-async def end_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Non faccio nulla ancora')
 
 #Funzioni
 
@@ -335,3 +404,4 @@ if __name__ == '__main__':
     app.run_polling(poll_interval=3)
 
 print("terminato")
+
