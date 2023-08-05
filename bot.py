@@ -126,6 +126,8 @@ HEADERS : final = {
 
 # Dizionario per tenere traccia degli utenti che hanno già premuto il pulsante
 users_pressed_button = {}
+users_autentication = {}
+users_class = []
 
 #funzione per scaricare la pagina web
 def get_html_content(LINK):
@@ -136,40 +138,24 @@ def get_html_content(LINK):
     else:
         print("Errore nella request, codice:",response.status_code)
     
-'''
+
 #funzione per analizzare la pagina
 def extract_names_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
-
     table = soup.find("table", class_="table table-striped table-condensed") #trovo la tabella con la classe "table table-striped table-condensed"
     rows = table.find_all("tr")
-
-    values = []
-    for row in rows[0:6]:
+    names = []
+    for row in rows[0:]:
         row_values = [value.get_text(strip=True) for value in row.find_all("td")] #lista che contiene i testi dei tag <td> (colonne) presenti nella riga corrente della tabella
         if any(row_values):
-            #print(row_values[0])
-            values.append(row_values[0])
+            names.append(row_values[0])
 
-    values = [row for row in values if any(row[1:])]
-    docenti_array = []
+    return names
 
-    for row in values:
-        for value in row[1:]:
-            docenti_array.append(value)
-
-    table_string = "Elenco del personale\n\n"
-    for row in values:
-        #row_string = "\n".join([f"{header}: {value}" for header, value in zip(headers, row)])
-        row_string = "\n".join([f"{value}" for value in zip(row)])
-        table_string += f"{row_string}\n\n"
-
-    return table_string
-'''
 
 ################################################################################
 
-# PROVA DATABASE
+"""# PROVA DATABASE
 
 # Connessione al database
 connection = sqlite3.connect('database.db')
@@ -241,7 +227,7 @@ for row in cursor.fetchall(): #fetchall = tutte le righe estratte
 # Chiusura di connessione e cursore del database
 cursor.close()
 connection.close()
-
+"""
 
 #################################################################################
 
@@ -261,12 +247,13 @@ async def start_command(update: Update, context: CallbackContext):
     user = update.effective_user
     user_id = get_user_id(update)
     users_pressed_button[user_id] = False  # Impostiamo l'utente come non ha ancora premuto il pulsante
+    users_autentication[user_id] = False
     await update.message.reply_text(
         f"Ciao, {user.first_name}!\n"
-        "Scegli un'opzione:",
+        "Chi sei ?",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Studente", callback_data="opzione_1")],
-            [InlineKeyboardButton("Professore", callback_data="opzione_2")],
+            [InlineKeyboardButton("Studente", callback_data="Studente")],
+            [InlineKeyboardButton("Professore", callback_data="Professore")],
         ]),
     )
     """
@@ -288,20 +275,27 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "- /leggi ID_studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"
     await update.message.reply_text(help_msg)
 
-async def lista_docenti_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
-    html_content = get_html_content(LINK)# Ottieni il contenuto HTML
-    #names = extract_names_html(html_content)# Analizza il contenuto con Beautiful Soup
-    #await update.message.reply_text(names)
+#solo per studenti
+async def lista_docenti_command(update: Update, context: CallbackContext): #context: ContextTypes.DEFAULT_TYPE
+    user_id = get_user_id(update)
+    if users_class:
+        for element in users_class:
+            id = element[0]
+            if id == user_id:
+                option_selected = element[1]
+    else :
+        option_selected = "non valida"
+        await update.message.reply_text("Non hai il permeso di eseguire questo comando")
 
-    soup = BeautifulSoup(html_content, "html.parser")
-    table = soup.find("table", class_="table table-striped table-condensed") #trovo la tabella con la classe "table table-striped table-condensed"
-    rows = table.find_all("tr")
-    names = []
-    for row in rows[0:]:
-        row_values = [value.get_text(strip=True) for value in row.find_all("td")] #lista che contiene i testi dei tag <td> (colonne) presenti nella riga corrente della tabella
-        if any(row_values):
-            names.append(row_values[0])
-            await update.message.reply_text(row_values[0])
+    if option_selected == "Studente" and users_autentication.get(user_id, True): # cioè è uno studente e si è autenticato
+        html_content = get_html_content(LINK)# Ottieni il contenuto HTML
+        names = extract_names_html(html_content)# Analizza il contenuto con Beautiful Soup
+
+        keyboard = [[InlineKeyboardButton(name, callback_data=name)] for name in names]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("Seleziona un professore:", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text("Non hai il permeso di eseguire questo comando")
 
 
 async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
@@ -319,15 +313,16 @@ async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #so
 # Funzione di gestione del callback dei pulsanti inline
 async def handle_button(update: Update, context: CallbackContext):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = get_user_id(update)#query.from_user.id
 
     if not users_pressed_button.get(user_id, False):
         option_selected = query.data
+        users_class.append([user_id,option_selected ])
 
-        if option_selected == "opzione_1":
-            await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Studente. Scrivmi il tuo ID.")
-        elif option_selected == "opzione_2":
-            await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Professore. Scrivmi il tuo ID.")
+        if option_selected == "Studente":
+            await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Studente. Scrivi la tua matricola.")
+        elif option_selected == "Professore":
+            await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Professore. Scrivi la tua matricola.")
         else:
             await query.answer("Opzione non valida.")
         # Imposta l'utente come ha premuto il pulsante
@@ -339,15 +334,20 @@ async def handle_button(update: Update, context: CallbackContext):
 def handle_response_int(text: int,update: Update) -> str:
     #processed: str = text.lower()
     user_id = get_user_id(update)
+    number = text
+    text = str(text)
     if users_pressed_button.get(user_id, False):
         if (len(text) == 6):
             result = random_with_50_percent_probability()
 
             if(result):
+                users_autentication[user_id] = True
                 return 'ID accettato'
             else:
+                users_autentication[user_id] = False
                 return 'risposta non accettata'
     else:
+        users_autentication[user_id] = False
         return 'scegli studente o professore'
     
 def handle_response(text: str,update: Update) -> str:
