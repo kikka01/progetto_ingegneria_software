@@ -126,8 +126,15 @@ HEADERS : final = {
 
 # Dizionario per tenere traccia degli utenti che hanno già premuto il pulsante
 users_pressed_button = {}
-users_autentication = {}
-users_class = []
+users_autentication = {} #dizionario che ci dice se l'utente si è autenticato correttamente
+users_class = [] #ogni elemento della lista è una tupla composta da [user_id, "studente"/"professore"]
+prof_names = []
+
+def get_class_of_user(id):
+    for id_u,clas in users_class:
+        if id == id_u:
+            return clas
+    return "errore"
 
 #funzione per scaricare la pagina web
 def get_html_content(LINK):
@@ -149,6 +156,7 @@ def extract_names_html(html_content):
         row_values = [value.get_text(strip=True) for value in row.find_all("td")] #lista che contiene i testi dei tag <td> (colonne) presenti nella riga corrente della tabella
         if any(row_values):
             names.append(row_values[0])
+            prof_names.append(row_values[0])
 
     return names
 
@@ -278,16 +286,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #solo per studenti
 async def lista_docenti_command(update: Update, context: CallbackContext): #context: ContextTypes.DEFAULT_TYPE
     user_id = get_user_id(update)
+    
     if users_class:
-        for element in users_class:
-            id = element[0]
-            if id == user_id:
-                option_selected = element[1]
+        class_of_user = get_class_of_user(user_id)
     else :
-        option_selected = "non valida"
+        class_of_user = "non valido"
         await update.message.reply_text("Non hai il permeso di eseguire questo comando")
 
-    if option_selected == "Studente" and users_autentication.get(user_id, True): # cioè è uno studente e si è autenticato
+    if class_of_user == "Studente" and users_autentication.get(user_id, True): # cioè è uno studente e si è autenticato
         html_content = get_html_content(LINK)# Ottieni il contenuto HTML
         names = extract_names_html(html_content)# Analizza il contenuto con Beautiful Soup
 
@@ -302,7 +308,13 @@ async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): 
     await update.message.reply_text('Non faccio nulla ancora')
 
 async def consegne_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
-    await update.message.reply_text('Non faccio nulla ancora')
+    user_id = get_user_id(update)
+    if users_class:
+        class_of_user = get_class_of_user(user_id)
+    else :
+        await update.message.reply_text('Autenticati prima')
+    if class_of_user == "Professore":
+        await update.message.reply_text('Scivi matricola studente.')
 
 async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
     await update.message.reply_text('Non faccio nulla ancora')
@@ -314,21 +326,23 @@ async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #so
 async def handle_button(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = get_user_id(update)#query.from_user.id
+    option_selected = query.data
+    if option_selected == "Studente" or option_selected == "Professore":
+        if not users_pressed_button.get(user_id, False):
+            users_class.append([user_id,option_selected ])
 
-    if not users_pressed_button.get(user_id, False):
-        option_selected = query.data
-        users_class.append([user_id,option_selected ])
-
-        if option_selected == "Studente":
-            await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Studente. Scrivi la tua matricola.")
-        elif option_selected == "Professore":
-            await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Professore. Scrivi la tua matricola.")
+            if option_selected == "Studente":
+                await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Studente. Scrivi la tua matricola.")
+            elif option_selected == "Professore":
+                await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Professore. Scrivi la tua matricola.")
+            else:
+                await query.answer("Opzione non valida.")
+            # Imposta l'utente come ha premuto il pulsante
+            users_pressed_button[user_id] = True
         else:
-            await query.answer("Opzione non valida.")
-        # Imposta l'utente come ha premuto il pulsante
-        users_pressed_button[user_id] = True
-    else:
-        await query.answer("Hai già premuto il pulsante.")
+            await query.answer("Hai già premuto il pulsante.")
+    elif [[option_selected == name] for name in prof_names]:
+        await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato "+option_selected+". invia le foto e poi scrivi \"termina\"")
 
 #funzioni risposta ai messaggi
 def handle_response_int(text: int,update: Update) -> str:
@@ -351,8 +365,18 @@ def handle_response_int(text: int,update: Update) -> str:
         return 'scegli studente o professore'
     
 def handle_response(text: str,update: Update) -> str:
+    user_id = get_user_id(update)
     processed: str = text.lower()
+    if users_class:
+        class_of_user = get_class_of_user(user_id)
+    else :
+        return "Autenticati prima"
 
+    if class_of_user == "Studente" and users_autentication.get(user_id, True):
+        if processed == "termina":
+            return "foto salvate" #termina bot
+    elif class_of_user == "Professore" and users_autentication.get(user_id, True):
+        return "fai gestiione altri comandi"
     return 'testo non accettato'
 
 
