@@ -303,10 +303,6 @@ async def lista_docenti_command(update: Update, context: CallbackContext): #cont
     else:
         await update.message.reply_text("Non hai il permeso di eseguire questo comando")
 
-
-async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
-    await update.message.reply_text('Non faccio nulla ancora')
-
 async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
     user_id = get_user_id(update)
     if users_class:
@@ -315,7 +311,9 @@ async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text('Autenticati prima')
     if class_of_user == "Professore":
         await update.message.reply_text('Scivi matricola studente.')
-
+    elif class_of_user == "Studente":
+        await update.message.reply_text('Invia le foto e scrivi \"fine\" per salvarle nel database.')
+    
     cursor.execute("select * from compiti_consegnati")
     for row in cursor.fetchall():
         output_string = "({}) Lo studente {} ha consegnato al docente {}, in data {}".format(row[0], row[1], row[2], row[3])
@@ -356,7 +354,7 @@ async def handle_button(update: Update, context: CallbackContext):
         else:
             await query.answer("Hai già premuto il pulsante.")
     elif [[option_selected == name] for name in prof_names]:
-        await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato "+option_selected+". invia le foto e poi scrivi \"termina\"")
+        await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato "+option_selected+". Esegui il comando /consegna per inviare le foto.")
 
 #funzioni risposta ai messaggi
 def handle_response_int(text: int,update: Update) -> str:
@@ -390,7 +388,7 @@ def handle_response(text: str,update: Update) -> str:
         if processed == "termina":
             return "foto salvate" #termina bot
     elif class_of_user == "Professore" and users_autentication.get(user_id, True):
-        return "fai gestiione altri comandi"
+        return "fai gestione altri comandi"
     return 'testo non accettato'
 
 
