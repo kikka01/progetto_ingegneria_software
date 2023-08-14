@@ -5,9 +5,10 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import random
 import requests
 from bs4 import BeautifulSoup
-import re
 import sqlite3
 import os
+from PIL import Image
+import numpy as np
 
 print('Starting up bot...')
 
@@ -268,9 +269,9 @@ def handle_response(text: str,update: Update) -> str:
         return "input non accettato"
     return 'testo non accettato'
 
-async def handle_image(text ,update: Update):
+async def handle_image(update: Update, context: CallbackContext):
     user_id = get_user_id(update)
-    print("img ok")
+    
     
     if users_class:
         class_of_user = get_class_of_user(user_id)
@@ -280,7 +281,11 @@ async def handle_image(text ,update: Update):
 
     if class_of_user == "Studente" and users_autentication.get(user_id, True) and not users_foto.get(user_id, "False"): # cioè è uno studente e si è autenticato e ha inserito il comando 
         prof_name = users_foto[user_id]
-        photo_id = update.message.photo[-1].file_id
+        img = update.message.photo[-1].get_file()
+        dir = os.path.join(script_directory, 'image.jpg')
+        img.download(dir)
+        img = Image.open(dir)
+        numpydata = np.asarray(img)
         # save_photo_in_database(user_id, photo_id) #metodo da scrivere per salvare nel database
 
 
@@ -295,7 +300,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if type(text)==str:
         response: str = handle_response(text,update)
     else:
-        handle_image(text,update)
+        handle_image(update, CallbackContext)
         response: str = "img"
 
     # Reply normal if the message is in private
@@ -357,10 +362,6 @@ if __name__ == '__main__':
            "data_e_ora varchar(20) not null);"
     connection.execute(tab3)  # creazione della tabella vuota
 
-    cursor.execute("select * from studenti_e_password")
-    for row in cursor.fetchall():
-        print("Sono lo studente {} con password {}".format(row[0], row[1]))
-        print(row[0])
     # Commands
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
