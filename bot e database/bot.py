@@ -1,107 +1,3 @@
-"""
-@consegna_compito_bot
-Autori: Chiara e Leonardo
-"""
-"""
-import logging
-import telegram
-# import telegram.ext
-# import telebot
-# import sqlite3
-# import settings
-import bs4  # permette di estrarre facilmente dei dati dalle pagine HTML che compongono i siti web
-from bs4 import BeautifulSoup
-import requests  # per accedere ai siti web tramite richieste HTTP
-#bs4 va installata usando il comando: pip install bs4
-#requests va installata usando il comando: pip install requests
-import webbrowser  # per aprire automaticamente i siti web sul browser
-
-
-token = "6370580588:AAGKKqCgMAtPduC4Nb63IzwPepFycdkvn8w"
-bot = telebot.TeleBot(token)
-
-# roba che non so se effettivamente è utile
-updater = Updater(token)
-updater.dispatcher.add_handler(CommandHandler("start", start))
-updater.dispatcher.add_handler(CommandHandler("end", end))
-updater.start_polling()
-updater.idle()
-
-
-# Gestore del comando /start
-# Studenti e docenti possono utilizzare il comando /start per avviare il bot.
-def start(update, context):      #update rappresenta un update in arrivo, context serve a portare informazioni aggiuntive all'update
-    chat_id = update.effective_chat.id   #id della chat da cui stiamo ricevendo il comando
-    update.message.reply_text("start")   #utility per rispondere velocemente al messaggio ricevuto
-    print("start called from chat with id = {}".format(chat_id))
-
-
-def start(update, context):
-    start_msg = "*Benvenuto a* @consegna_compito_bot.\n"\
-	"- Se sei uno STUDENTE, questo bot ti permetterà di visualizzare l\'elenco dei docenti. \n"\
-        "Ti permetterà inoltre di consegnare al proprio docente le foto della prova scritta. \n\n"\
-        "- Se sei un DOCENTE, questo bot ti permetterà di visualizzare l\'elenco degli studenti che hanno consegnato. \n"\
-        "Ti permetterà inoltre di visualizzare le foto caricate dagli studenti nel giorno corrente. \n\n"\
-        "Per visualizzare i comandi disponibili utilizza /help\n\n"
-    update.message.reply_markdown(start_msg, reply_markup=ReplyKeyboardRemove())
-    pp.flush()
-
-
-def help(update, context):
-    help_msg = "Ecco una lista dei *comandi* attualmente disponibili su questo bot:\n\n"\
-        "- /help: Visualizza questo messaggio\n"\
-        "- /lista_docenti: Visualizza l\'elenco dei docenti e i loro ID\n"\
-        "- /consegna ID_docente: Permette il caricamento delle foto della prova scritta per la consegna al docente\n"\
-        "- /consegne: Visualizza gli ID degli studenti che hanno effettuato consegne nel giorno corrente\n"\
-        "- /leggi ID_studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"\
-        "- /end: Interrompe il comando attualmente in esecuzione\n"
-    update.message.reply_markdown(help_msg)
-
-# Gestore del comando /lista_docenti
-# Gli studenti possono utilizzare il comando /lista_docenti per ottenere
-# l'elenco dei docenti e i loro ID.
-# Per il comando /lista_docenti, recupera le informazioni sui docenti dalla
-# tabella "docenti" e invia un messaggio contenente l'elenco degli studenti
-# e dei loro ID.
-LINK = "https://www.dmi.unipg.it/dipartimento/rubrica?categoria=DOC&lettera=&pagina="
-
-
-# Gestore del comando /consegna
-# Gli studenti possono utilizzare il comando /consegna ID_docente per caricare
-# la foto della prova scritta per la consegna al docente.
-# Per il comando /consegna, salva le informazioni sulla consegna nella tabella
-# "consegne", inclusa la foto caricata dallo studente.
-
-
-# Gestore del comando /consegne
-# I docenti possono utilizzare il comando /consegne per visualizzare gli ID
-# degli studenti che hanno effettuato consegne nel giorno corrente.
-# Per il comando /consegne, recupera gli ID degli studenti che hanno effettuato
-# consegne nel giorno corrente dalla tabella "consegne" e invia un messaggio
-# contenente l'elenco degli ID degli studenti.
-
-
-# Gestore del comando /leggi
-# I docenti possono utilizzare il comando /leggi ID_studente per visualizzare
-# o scaricare le foto caricate dagli studenti nel giorno corrente.
-# Per il comando /leggi, recupera le foto caricate dagli studenti nel giorno
-# corrente dalla tabella "consegne" utilizzando l'ID dello studente specificato
-# e invia o rendi scaricabile la foto al docente.
-
-
-PUO SERVIRE 
-update.message.reply_text(
-        f"Ciao, {user.first_name}! Benvenuto nel bot.\n"
-        "Scegli un'opzione:",
-        reply_markup={
-            "keyboard": [["Opzione 1"], ["Opzione 2"]],
-            "one_time_keyboard": True,
-            "resize_keyboard": True,
-        },
-    )
-    
-"""
-
 from typing import final
 from urllib.parse import urljoin
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -111,7 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import sqlite3
-
+import os
 
 print('Starting up bot...')
 
@@ -129,6 +25,7 @@ users_pressed_button = {}
 users_autentication = {} #dizionario che ci dice se l'utente si è autenticato correttamente
 users_class = [] #ogni elemento della lista è una tupla composta da [user_id, "studente"/"professore"]
 prof_names = []
+users_foto = {} 
 
 def get_class_of_user(id):
     for id_u,clas in users_class:
@@ -139,13 +36,28 @@ def get_class_of_user(id):
 #funzione per scaricare la pagina web
 def get_html_content(LINK):
     response = requests.get(LINK, headers=HEADERS)
-    # print(response.text)
     if response.status_code == 200:
         return response.text
     else:
         print("Errore nella request, codice:",response.status_code)
-    
-
+#funzione per verificare le matricole    
+def autenticazione_studenti(matricola_fornita, password_fornita):
+    cursor.execute("select * from studenti_e_password where ID_studente = ?", (matricola_fornita,))
+    row = cursor.fetchone()
+    if row is not None and password_fornita == row[1]:
+        result = True
+    else:
+        result = False
+    return result
+#funzione per verificare i prof
+def autenticazione_prof(nome_prof_fornito, password_fornita):
+    cursor.execute("select * from docenti_e_password where ID_docente = ?", (nome_prof_fornito,))
+    row = cursor.fetchone()
+    if row is not None and password_fornita == row[1]:
+        result = True
+    else:
+        result = False
+    return result
 #funzione per analizzare la pagina
 def extract_names_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
@@ -160,84 +72,27 @@ def extract_names_html(html_content):
 
     return names
 
+#funzione per inviare foto del compito nella chat del prof
+async def send_photo(update: Update, matricola):
+    foto_compito = []
+    if update.message.text.lower() == "invia foto":
+        foto_compito = get_photos_from_database(matricola) #da aggiungere
+        if foto_compito:
+            for foto in foto_compito:
+                await update.message.reply_photo(photo=foto)
+                # chat_id = update.message.chat_id
+                # context.bot.send_photo(chat_id, photo=image)
+        else:
+            await update.message.reply_text("Foto non trovata.")
 
-################################################################################
-
-"""# PROVA DATABASE
-
-# Connessione al database
-connection = sqlite3.connect('database.db')
-cursor = connection.cursor()  # Ottieni il cursore per eseguire le query
-
-
-# Creazione della tabella "studenti_e_password" nel database con due campi: ID_studente, password_studente
-tab1 = "create table studenti_e_password (" 
-       "ID_studente primary key int not null," \
-       "password_studente char(3) not null);"
-connection.execute(tab1)  # creazione della tabella vuota
-
-# Inserimento di dati (righe) nella tabella studenti_e_password
-item1 = [331332, 'abc']  #array con i dati che voglio inserire
-cursor.execute('insert into studenti_e_password values (?,?);', item1) #ID_studente, password_studente
-connection.commit()  #conferma i dati e li scrive nel database
-
-item2 = [330350, 'def']
-cursor.execute('insert into studenti_e_password values (?,?);', item2)
-connection.commit()  #conferma i dati e li scrive nel database
-
-
-# Creazione della tabella "docenti_e_password" nel database con due campi: ID_docente, password_docente
-tab2 = "create table docenti_e_password (" 
-       "ID_docente primary key varchar(30) not null," \
-       "password_docente int not null);"
-connection.execute(tab2)  # creazione della tabella vuota
-
-# Inserimento di dati (righe) nella tabella docenti_e_password
-item = []
-for i in range(0,len(names)-1):
-    item = [names[i],i]
-    cursor.execute('insert into docenti_e_password values (?,?);', item) #ID_docente, password_docente
-    connection.commit() #conferma i dati e li scrive nel database
-
-
-# Creazione della tabella "compiti_consegnati" nel database con quattro campi: code_foto, ID_studente, ID_docente, data_ora
-tab3 = "create table compiti_consegnati (" 
-       "code_foto int primary key not null," \
-       "ID_studente int not null," \
-       "ID_docente varchar(30) not null," \
-       "data_e_ora varchar(20) not null);"
-connection.execute(tab3)  # creazione della tabella vuota
-
-# Inserimento di dati (righe) nella tabella compiti_consegnati
-current_date = datetime.now()
-formatted_date_time = current_date.strftime("%Y-%m-%d %H:%M:%S") #es. "2023-07-29 15:30:45"
-
-item = []  #array con i dati che voglio inserire
-# Riempo item con i nuovi dati da aggiungere
-#item[0] = ?? #code_foto (con numpy)
-#item[1] = ?? #ID_studente
-#item[2] = ?? #ID_docente
-item[3] = formatted_date_time #data_e_ora
-cursor.execute('insert into compiti_consegnati values (?,?,?,?);', item) #code_foto, ID_studente, ID_docente, data_e_ora
-connection.commit()  #conferma i dati e li scrive nel database
-
-
-# Lettura (query) della tabella compiti_consegnati
-cursor.execute("select * from compiti_consegnati") #DA INSERIRE FILTRI
-# esempi filtri:
-# cursor.execute("select * from compiti_consegnati where ID_studente == 331332")
-for row in cursor.fetchall(): #fetchall = tutte le righe estratte
-    print("({}) studente {} consegna a docente {}, in data {}".format(row[0], row[1], row[2], row[3]))
-    #formattazione: segnaposto={}
-    #row = struttura (array) con i dati che vengono estratti da ogni riga
-
-
-# Chiusura di connessione e cursore del database
-cursor.close()
-connection.close()
-"""
-
-#################################################################################
+#estrae foto dal database e lil restituisce a lista
+def get_photos_from_database(matricola):
+    photos = [] #lista composta da due elementi 
+    cursor.execute("select * from compiti_consegnati where ID_studente == ?",matricola)
+    for row in cursor.fetchall(): #fetchall = tutte le righe estratte
+        #output_string = "({}) Lo studente {} ha consegnato al docente {}, in data {}".format(row[0], row[1], row[2], row[3]) 
+        photos.append([row[0],row[3]]) #il primo è un immagine e il secondo è la data e ora 
+    return photos
 
 # funzioni utili
 def get_user_id(update: Update):
@@ -256,6 +111,7 @@ async def start_command(update: Update, context: CallbackContext):
     user_id = get_user_id(update)
     users_pressed_button[user_id] = False  # Impostiamo l'utente come non ha ancora premuto il pulsante
     users_autentication[user_id] = False
+    users_foto[user_id] = "False"
     await update.message.reply_text(
         f"Ciao, {user.first_name}!\n"
         "Chi sei ?",
@@ -264,23 +120,14 @@ async def start_command(update: Update, context: CallbackContext):
             [InlineKeyboardButton("Professore", callback_data="Professore")],
         ]),
     )
-    """
-    start_msg = "Benvenuto a", BOT_USERNAME,".\n"\
-	"- Se sei uno STUDENTE, questo bot ti permetterà di visualizzare l\'elenco dei docenti. \n"\
-        "Ti permetterà inoltre di consegnare al proprio docente le foto della prova scritta. \n\n"\
-        "- Se sei un DOCENTE, questo bot ti permetterà di visualizzare l\'elenco degli studenti che hanno consegnato. \n"\
-        "Ti permetterà inoltre di visualizzare le foto caricate dagli studenti nel giorno corrente. \n\n"\
-        "Per visualizzare i comandi disponibili utilizza /help\n\n"
-    await update.message.reply_text(start_msg)
-    """
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_msg = "Ecco una lista dei *comandi* attualmente disponibili su questo bot:\n\n"\
         "- /help: Visualizza questo messaggio\n"\
-        "- /lista_docenti: Visualizza l\'elenco dei docenti e i loro ID\n"\
-        "- /consegna ID_docente: Permette il caricamento delle foto della prova scritta per la consegna al docente\n"\
-        "- /consegne: Visualizza gli ID degli studenti che hanno effettuato consegne nel giorno corrente\n"\
-        "- /leggi ID_studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"
+        "- /lista_docenti: Visualizza l\'elenco dei docenti e ti permette di scegliere a chi inviare le foto del compito, se sei uno studente\n"\
+        "- /consegna: Permette il caricamento delle foto della prova scritta per la consegna al docente selezionato in precedenza\n"\
+        "- /lsta_consegne: Visualizza gli ID degli studenti che hanno effettuato consegne nel giorno corrente\n"\
+        "- /leggi matricola-studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"
     await update.message.reply_text(help_msg)
 
 #solo per studenti
@@ -303,6 +150,18 @@ async def lista_docenti_command(update: Update, context: CallbackContext): #cont
     else:
         await update.message.reply_text("Non hai il permeso di eseguire questo comando")
 
+async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
+    user_id = get_user_id(update)
+    if users_class:
+        class_of_user = get_class_of_user(user_id)
+    else :
+        await update.message.reply_text('Autenticati prima')
+    if class_of_user == "Studente":
+        users_foto[user_id] = True
+        await update.message.reply_text('Invia le foto e scrivi \"fine\" per salvarle nel database.')
+    else:
+        await update.message.reply_text('Non puoi eseguire questo comando se sei un Professore')
+
 async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
     user_id = get_user_id(update)
     if users_class:
@@ -310,9 +169,9 @@ async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_T
     else :
         await update.message.reply_text('Autenticati prima')
     if class_of_user == "Professore":
-        await update.message.reply_text('Scivi matricola studente.')
-    elif class_of_user == "Studente":
-        await update.message.reply_text('Invia le foto e scrivi \"fine\" per salvarle nel database.')
+        await update.message.reply_text('lista studenti che hanno consegnato con rispettiva matricola') #aggiungere
+    else:
+        await update.message.reply_text('Non puoi eseguire questo comando se sei uno Studente')
     
     cursor.execute("select * from compiti_consegnati")
     for row in cursor.fetchall():
@@ -320,16 +179,25 @@ async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_T
         update.message.reply(output_string)
 
 async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
-    '''
-    #await update.message.reply_text('Scrivi ID dello studente di cui vuoi vedere le foto')
-    #la riga prima è da mettere quando chiamerò la funzione (devo capire bene come)
-    studente_richiesto = update.message.text
-    cursor.execute("select * from compiti_consegnati where ID_studente == studente_richiesto")
-    for row in cursor.fetchall(): #fetchall = tutte le righe estratte
-        output_string = "({}) Lo studente {} ha consegnato al docente {}, in data {}".format(row[0], row[1], row[2], row[3])
-        update.message.reply(output_string)
-    '''
-    await update.message.reply_text('Non faccio nulla ancora')
+    user_id = get_user_id(update)
+    if users_class:
+        class_of_user = get_class_of_user(user_id)
+    else :
+        await update.message.reply_text('Autenticati prima')
+    if class_of_user == "Professore":
+        args = context.args
+        if args:
+            matricola_st = args[0]
+            print(matricola_st)
+            message = f"Hai selezionato {matricola_st}"# aggiungere Fai vedere immagini dello studente
+            send_photo(matricola_st)  
+        else:
+            message = "Inserisci il numero della matricola corrispondente allo studente del qale si vogliono scaricare le immagini, dopo il comando"
+
+        update.message.reply_text(message)
+    else:
+        await update.message.reply_text('Non puoi eseguire questo comando se sei uno Studente')
+    await update.message.reply_text(message)
 
 
 #Funzioni
@@ -344,52 +212,76 @@ async def handle_button(update: Update, context: CallbackContext):
             users_class.append([user_id,option_selected ])
 
             if option_selected == "Studente":
-                await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Studente. Scrivi la tua matricola.")
+                await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Studente. Scrivi la tua matricola e la password.")
             elif option_selected == "Professore":
-                await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Professore. Scrivi la tua matricola.")
+                await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Professore. Scrivi il tuo cognome, nome e password.")
             else:
                 await query.answer("Opzione non valida.")
             # Imposta l'utente come ha premuto il pulsante
             users_pressed_button[user_id] = True
         else:
-            await query.answer("Hai già premuto il pulsante.")
+            await query.answer("Hai già premuto il pulsante. Per modificare la scelta riavvia il bot con /start")
     elif [[option_selected == name] for name in prof_names]:
+        users_foto[user_id] = str(option_selected)
         await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato "+option_selected+". Esegui il comando /consegna per inviare le foto.")
 
-#funzioni risposta ai messaggi
-def handle_response_int(text: int,update: Update) -> str:
-    #processed: str = text.lower()
-    user_id = get_user_id(update)
-    number = text
-    text = str(text)
-    if users_pressed_button.get(user_id, False):
-        if (len(text) == 6):
-            result = random_with_50_percent_probability()
-
-            if(result):
-                users_autentication[user_id] = True
-                return 'ID accettato'
-            else:
-                users_autentication[user_id] = False
-                return 'risposta non accettata'
-    else:
-        users_autentication[user_id] = False
-        return 'scegli studente o professore'
-    
 def handle_response(text: str,update: Update) -> str:
     user_id = get_user_id(update)
     processed: str = text.lower()
     if users_class:
         class_of_user = get_class_of_user(user_id)
     else :
-        return "Autenticati prima"
-
+        class_of_user = "non valido"
+        return "Scegli studente o professore"
+    strings = text.split()
+    print(strings)
+    if class_of_user == "Studente" and not users_autentication.get(user_id, True):
+        if len(strings) == 2:
+            result = autenticazione_studenti(strings[0], strings[1])
+            if result:
+                users_autentication[user_id] = True
+                return "Autenticazione eseguita correttamente"
+            else:
+                users_autentication[user_id] = False
+                return "Autenticazione rifiutata"
+        else:
+            print(len(strings))
+            return 'testo non accettato'
+    if class_of_user == "Professore" and not users_autentication.get(user_id, True):
+        if len(strings) > 2:
+            password = strings[len(strings)-1]
+            nome = ''.join( x for x in strings if x not in password)
+            result = autenticazione_prof(nome, password)
+            if result:
+                users_autentication[user_id] = True
+                return "Autenticazione eseguita correttamente"
+            else:
+                users_autentication[user_id] = False
+                return "Autenticazione rifiutata"
+        else:
+            return 'testo non accettato'
     if class_of_user == "Studente" and users_autentication.get(user_id, True):
-        if processed == "termina":
+        if processed == "fine":
+            users_foto[user_id] = "False"
             return "foto salvate" #termina bot
     elif class_of_user == "Professore" and users_autentication.get(user_id, True):
-        return "fai gestione altri comandi"
+        return "input non accettato"
     return 'testo non accettato'
+
+async def handle_image(text ,update: Update):
+    user_id = get_user_id(update)
+    print("img ok")
+    
+    if users_class:
+        class_of_user = get_class_of_user(user_id)
+    else :
+        class_of_user = "non valido"
+        await update.message.reply_text("Non hai il permeso di eseguire questo comando")
+
+    if class_of_user == "Studente" and users_autentication.get(user_id, True) and not users_foto.get(user_id, "False"): # cioè è uno studente e si è autenticato e ha inserito il comando 
+        prof_name = users_foto[user_id]
+        photo_id = update.message.photo[-1].file_id
+        # save_photo_in_database(user_id, photo_id) #metodo da scrivere per salvare nel database
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -399,11 +291,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # utile per debugging
     print(f'User ({update.message.chat.id}) in {message_type}: "{text}"')
-    digit = remove_spaces(text)
-    if digit.isdigit():
-        response: str = handle_response_int(int(digit),update)
-    else:
+
+    if type(text)==str:
         response: str = handle_response(text,update)
+    else:
+        handle_image(text,update)
+        response: str = "img"
 
     # Reply normal if the message is in private
     print('Bot:', response)
@@ -421,7 +314,9 @@ if __name__ == '__main__':
     app = Application.builder().token(TOKEN).build()
 
     # Connessione al database
-    connection = sqlite3.connect('database.db')
+    script_directory = os.path.dirname(os.path.abspath(__file__)) #prende il path assoluto della cartella corrente
+    database_path = os.path.join(script_directory, 'database.db') #ci aggiungo il nome del database
+    connection = sqlite3.connect(database_path)
     cursor = connection.cursor()  # Ottieni il cursore per eseguire le query
 
     # Creazione della tabella "studenti_e_password" nel database con due campi: ID_studente, password_studente
@@ -432,11 +327,11 @@ if __name__ == '__main__':
 
     # Inserimento di dati (righe) nella tabella studenti_e_password
     item1 = [331332, 'abc']  #array con i dati che voglio inserire
-    cursor.execute('insert into studenti_e_password values (?,?);', item1) #ID_studente, password_studente
+    cursor.execute('insert or ignore into studenti_e_password values (?,?);', item1) #ID_studente, password_studente
     connection.commit()  #conferma i dati e li scrive nel database
 
     item2 = [330350, 'def']
-    cursor.execute('insert into studenti_e_password values (?,?);', item2)
+    cursor.execute('insert or ignore into studenti_e_password values (?,?);', item2)
     connection.commit()  #conferma i dati e li scrive nel database
 
     # Creazione della tabella "docenti_e_password" nel database con due campi: ID_docente, password_docente
@@ -451,7 +346,7 @@ if __name__ == '__main__':
     item = []
     for i in range(0,len(names)-1):
         item = [names[i],i]
-        cursor.execute('insert into docenti_e_password values (?,?);', item) #ID_docente, password_docente
+        cursor.execute('insert or ignore into docenti_e_password values (?,?);', item) #ID_docente = nome e cognome, password_docente
         connection.commit() #conferma i dati e li scrive nel database
     
     # Creazione della tabella "compiti_consegnati" nel database con quattro campi: code_foto, ID_studente, ID_docente, data_ora
@@ -462,18 +357,23 @@ if __name__ == '__main__':
            "data_e_ora varchar(20) not null);"
     connection.execute(tab3)  # creazione della tabella vuota
 
-
+    cursor.execute("select * from studenti_e_password")
+    for row in cursor.fetchall():
+        print("Sono lo studente {} con password {}".format(row[0], row[1]))
+        print(row[0])
     # Commands
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
 
     app.add_handler(CommandHandler('lista_docenti', lista_docenti_command))
     app.add_handler(CommandHandler('consegna', consegna_command))
+    app.add_handler(CommandHandler('lsta_consegne', lista_consegne_command))
     app.add_handler(CommandHandler('leggi', leggi_command))
 
     # Messages
     app.add_handler(MessageHandler(filters.TEXT , handle_message))
     app.add_handler(CallbackQueryHandler(handle_button))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_image))
 
     # Log all errors
     app.add_error_handler(error)
