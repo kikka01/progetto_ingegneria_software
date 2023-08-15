@@ -25,8 +25,9 @@ HEADERS : final = {
 users_pressed_button = {}
 users_autentication = {} #dizionario che ci dice se l'utente si è autenticato correttamente
 users_class = [] #ogni elemento della lista è una tupla composta da [user_id, "studente"/"professore"]
+users_name = {} #salva il nome dell'user, quindi o la matricola o il cognome e nome del prof 
 prof_names = []
-users_foto = {} 
+users_foto = {} # salva quando l'user è uno studente il professore scelto 
 
 def get_class_of_user(id):
     for id_u,clas in users_class:
@@ -41,24 +42,7 @@ def get_html_content(LINK):
         return response.text
     else:
         print("Errore nella request, codice:",response.status_code)
-#funzione per verificare le matricole    
-def autenticazione_studenti(matricola_fornita, password_fornita):
-    cursor.execute("select * from studenti_e_password where ID_studente = ?", (matricola_fornita,))
-    row = cursor.fetchone()
-    if row is not None and password_fornita == row[1]:
-        result = True
-    else:
-        result = False
-    return result
-#funzione per verificare i prof
-def autenticazione_prof(nome_prof_fornito, password_fornita):
-    cursor.execute("select * from docenti_e_password where ID_docente = ?", (nome_prof_fornito,))
-    row = cursor.fetchone()
-    if row is not None and password_fornita == row[1]:
-        result = True
-    else:
-        result = False
-    return result
+
 #funzione per analizzare la pagina
 def extract_names_html(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
@@ -73,13 +57,38 @@ def extract_names_html(html_content):
 
     return names
 
+#funzione per verificare l'autenticazione degli studenti nel database
+def autenticazione_studenti(matricola_fornita, password_fornita):
+    cursor.execute("select * from studenti_e_password where ID_studente = ?", (matricola_fornita,))
+    row = cursor.fetchone()
+    if row is not None and password_fornita == row[1]:
+        result = True
+    else:
+        result = False
+    return result
+
+#funzione per verificare l'autenticazione dei prof nel database
+def autenticazione_prof(nome_prof_fornito, password_fornita):
+    cursor.execute("select * from docenti_e_password where ID_docente = ?", (nome_prof_fornito,))
+    row = cursor.fetchone()
+    print(row[0])
+    print(row[1])
+    if row is not None and password_fornita == row[1]:
+        result = True
+    else:
+        result = False
+    return True
+
 #funzione per inviare foto del compito nella chat del prof
 async def send_photo(update: Update, matricola):
+    user_id = get_user_id
+    nome_prof = users_name[user_id]
     foto_compito = []
     if update.message.text.lower() == "invia foto":
-        foto_compito = get_photos_from_database(matricola) #da aggiungere
+        foto_compito = get_photos_from_database(matricola,nome_prof)
         if foto_compito:
             for foto in foto_compito:
+                # trsforma da numpy in foto se serve 
                 await update.message.reply_photo(photo=foto)
                 # chat_id = update.message.chat_id
                 # context.bot.send_photo(chat_id, photo=image)
@@ -87,13 +96,17 @@ async def send_photo(update: Update, matricola):
             await update.message.reply_text("Foto non trovata.")
 
 #estrae foto dal database e lil restituisce a lista
-def get_photos_from_database(matricola):
+def get_photos_from_database(matricola, nome_prof):
     photos = [] #lista composta da due elementi 
-    cursor.execute("select * from compiti_consegnati where ID_studente == ?",matricola)
+    cursor.execute("select * from compiti_consegnati where ID_studente == ? and ID_docente == ?",(matricola,nome_prof))
     for row in cursor.fetchall(): #fetchall = tutte le righe estratte
         #output_string = "({}) Lo studente {} ha consegnato al docente {}, in data {}".format(row[0], row[1], row[2], row[3]) 
         photos.append([row[0],row[3]]) #il primo è un immagine e il secondo è la data e ora 
     return photos
+
+#inserisce foto nel database e gli altri dati
+def save_photo_in_database(prof_name, numpydata, matricola):
+    return 0
 
 # funzioni utili
 def get_user_id(update: Update):
@@ -112,6 +125,7 @@ async def start_command(update: Update, context: CallbackContext):
     user_id = get_user_id(update)
     users_pressed_button[user_id] = False  # Impostiamo l'utente come non ha ancora premuto il pulsante
     users_autentication[user_id] = False
+    users_name[user_id] = "None"
     users_foto[user_id] = "False"
     await update.message.reply_text(
         f"Ciao, {user.first_name}!\n"
@@ -170,14 +184,16 @@ async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_T
     else :
         await update.message.reply_text('Autenticati prima')
     if class_of_user == "Professore":
-        await update.message.reply_text('lista studenti che hanno consegnato con rispettiva matricola') #aggiungere
+        nome_prof = users_name[user_id]
+        cursor.execute("select * from compiti_consegnati where ID_docente == ?",(nome_prof,))
+        for row in cursor.fetchall():
+            output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
+            print(row[0])
+            await update.message.reply(output_string)
+
     else:
         await update.message.reply_text('Non puoi eseguire questo comando se sei uno Studente')
     
-    cursor.execute("select * from compiti_consegnati")
-    for row in cursor.fetchall():
-        output_string = "({}) Lo studente {} ha consegnato al docente {}, in data {}".format(row[0], row[1], row[2], row[3])
-        update.message.reply(output_string)
 
 async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
     user_id = get_user_id(update)
@@ -190,7 +206,7 @@ async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #so
         if args:
             matricola_st = args[0]
             print(matricola_st)
-            message = f"Hai selezionato {matricola_st}"# aggiungere Fai vedere immagini dello studente
+            message = f"Hai selezionato {matricola_st}"
             send_photo(matricola_st)  
         else:
             message = "Inserisci il numero della matricola corrispondente allo studente del qale si vogliono scaricare le immagini, dopo il comando"
@@ -235,27 +251,27 @@ def handle_response(text: str,update: Update) -> str:
         class_of_user = "non valido"
         return "Scegli studente o professore"
     strings = text.split()
-    print(strings)
     if class_of_user == "Studente" and not users_autentication.get(user_id, True):
         if len(strings) == 2:
             result = autenticazione_studenti(strings[0], strings[1])
             if result:
+                users_name[user_id] = strings[0]
                 users_autentication[user_id] = True
                 return "Autenticazione eseguita correttamente"
             else:
                 users_autentication[user_id] = False
                 return "Autenticazione rifiutata"
         else:
-            print(len(strings))
             return 'testo non accettato'
     if class_of_user == "Professore" and not users_autentication.get(user_id, True):
         if len(strings) > 2:
             password = strings[len(strings)-1]
-            nome = ''.join( x for x in strings if x not in password)
+            nome = ' '.join( x for x in strings if x not in password)
             result = autenticazione_prof(nome, password)
             if result:
+                users_name[user_id] = nome
                 users_autentication[user_id] = True
-                return "Autenticazione eseguita correttamente"
+                return "Autenticazione eseguita correttamente, usa il comando /lista_consegne per vedere la lista degli studenti che hanno consegnato"
             else:
                 users_autentication[user_id] = False
                 return "Autenticazione rifiutata"
@@ -267,7 +283,7 @@ def handle_response(text: str,update: Update) -> str:
             return "foto salvate" #termina bot
     elif class_of_user == "Professore" and users_autentication.get(user_id, True):
         return "input non accettato"
-    return 'testo non accettato'
+    return 'sei già autenticato'
 
 async def handle_image(update: Update, context: CallbackContext):
     user_id = get_user_id(update)
@@ -281,13 +297,13 @@ async def handle_image(update: Update, context: CallbackContext):
 
     if class_of_user == "Studente" and users_autentication.get(user_id, True) and not users_foto.get(user_id, "False"): # cioè è uno studente e si è autenticato e ha inserito il comando 
         prof_name = users_foto[user_id]
+        matricola = users_name[user_id]
         img = update.message.photo[-1].get_file()
         dir = os.path.join(script_directory, 'image.jpg')
         img.download(dir)
         img = Image.open(dir)
         numpydata = np.asarray(img)
-        # save_photo_in_database(user_id, photo_id) #metodo da scrivere per salvare nel database
-
+        save_photo_in_database(prof_name, numpydata,matricola) 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # informazioni del tipo di messaggio ricevuto
@@ -368,7 +384,7 @@ if __name__ == '__main__':
 
     app.add_handler(CommandHandler('lista_docenti', lista_docenti_command))
     app.add_handler(CommandHandler('consegna', consegna_command))
-    app.add_handler(CommandHandler('lsta_consegne', lista_consegne_command))
+    app.add_handler(CommandHandler('lista_consegne', lista_consegne_command))
     app.add_handler(CommandHandler('leggi', leggi_command))
 
     # Messages
