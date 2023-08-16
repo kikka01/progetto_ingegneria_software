@@ -73,29 +73,35 @@ def autenticazione_prof(nome_prof_fornito, password_fornita):
     row = cursor.fetchone()
     print(row[0])
     print(row[1])
-    if row is not None and password_fornita == row[1]:
+    if row is not None and password_fornita == str(row[1]):
         result = True
     else:
         result = False
-    return True
+    return result
 
 #funzione per inviare foto del compito nella chat del prof
 async def send_photo(update: Update, matricola):
-    user_id = get_user_id
+    user_id = get_user_id  #CI VANNO LE PARENTESI? tipo get_user_id()
     nome_prof = users_name[user_id]
     foto_compito = []
     if update.message.text.lower() == "invia foto":
         foto_compito = get_photos_from_database(matricola,nome_prof)
         if foto_compito:
             for foto in foto_compito:
-                # trsforma da numpy in foto se serve 
-                await update.message.reply_photo(photo=foto)
+                # trasforma da numpy in foto se serve 
+                await update.message.reply_photo(photo=foto) #NON HO CAPITO DOVE HAI DEFINITO foto
                 # chat_id = update.message.chat_id
                 # context.bot.send_photo(chat_id, photo=image)
+            '''
+            for i in range(0,len(foto_compito)-1,2): #in quanto gli elementi pari sono le foto e quelli dispari sono data e ora
+                # trasforma da numpy in foto (FUNZIONE DA CREARE CREDO)
+                await update.message.reply_photo(photo=foto)
+                await update.message.reply_text("La foto che precede è stata mandata in data e ora ?", foto_compito[i+1])
+            '''
         else:
             await update.message.reply_text("Foto non trovata.")
 
-#estrae foto dal database e lil restituisce a lista
+#estrae foto dal database e le restituisce a lista
 def get_photos_from_database(matricola, nome_prof):
     photos = [] #lista composta da due elementi 
     cursor.execute("select * from compiti_consegnati where ID_studente == ? and ID_docente == ?",(matricola,nome_prof))
@@ -106,7 +112,12 @@ def get_photos_from_database(matricola, nome_prof):
 
 #inserisce foto nel database e gli altri dati
 def save_photo_in_database(prof_name, numpydata, matricola):
-    return 0
+    current_date = datetime.now()
+    formatted_date_time = current_date.strftime("%Y-%m-%d %H:%M:%S") #es. "2023-07-29 15:30:45"
+    item = [numpydata, matricola, prof_name, formatted_data_time]  #array con i dati che voglio inserire
+    cursor.execute('insert into compiti_consegnati values (?,?,?,?);', item) #code_foto, ID_studente, ID_docente, data_e_ora
+    connection.commit()  #conferma i dati e li scrive nel database
+    return
 
 # funzioni utili
 def get_user_id(update: Update):
@@ -141,7 +152,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "- /help: Visualizza questo messaggio\n"\
         "- /lista_docenti: Visualizza l\'elenco dei docenti e ti permette di scegliere a chi inviare le foto del compito, se sei uno studente\n"\
         "- /consegna: Permette il caricamento delle foto della prova scritta per la consegna al docente selezionato in precedenza\n"\
-        "- /lsta_consegne: Visualizza gli ID degli studenti che hanno effettuato consegne nel giorno corrente\n"\
+        "- /lista_consegne: Visualizza gli ID degli studenti che hanno effettuato consegne nel giorno corrente\n"\
         "- /leggi matricola-studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"
     await update.message.reply_text(help_msg)
 
