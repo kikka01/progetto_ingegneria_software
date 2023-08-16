@@ -1,14 +1,11 @@
 from typing import final
-from urllib.parse import urljoin
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InputFile
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes,Updater , CallbackQueryHandler, CallbackContext
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler, CallbackContext
 import random
 import requests
 from bs4 import BeautifulSoup
 import sqlite3
 import os
-from PIL import Image
-import numpy as np
 from datetime import datetime
 
 print('Starting up bot...')
