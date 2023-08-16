@@ -66,36 +66,11 @@ def autenticazione_studenti(matricola_fornita, password_fornita):
 def autenticazione_prof(nome_prof_fornito, password_fornita):
     cursor.execute("select * from docenti_e_password where ID_docente = ?", (nome_prof_fornito,))
     row = cursor.fetchone()
-    print(row[0])
-    print(row[1])
     if row is not None and password_fornita == str(row[1]):
         result = True
     else:
         result = False
     return result
-
-#funzione per inviare foto del compito nella chat del prof
-async def send_photo(update: Update, matricola):
-    user_id = get_user_id(update) 
-    nome_prof = users_name[user_id]
-    foto_date_database = []
-    if update.message.text.lower() == "invia foto":
-        foto_date_database = get_photos_from_database(matricola,nome_prof)
-        if foto_date_database:
-            for foto,data in foto_date_database:
-                foto = Image.fromarray(foto.astype(np.uint8))
-                await update.message.reply_photo(photo=foto) 
-                await update.message.reply_text(data)
-                # chat_id = update.message.chat_id
-                # context.bot.send_photo(chat_id, photo=image)
-            '''
-            for i in range(0,len(foto_compito)-1,2): #in quanto gli elementi pari sono le foto e quelli dispari sono data e ora
-                # trasforma da numpy in foto (FUNZIONE DA CREARE CREDO)
-                await update.message.reply_photo(photo=foto)
-                await update.message.reply_text("La foto che precede è stata mandata in data e ora ?", foto_compito[i+1])
-            '''
-        else:
-            await update.message.reply_text("Foto non trovata.")
 
 #estrae foto dal database e le restituisce a lista
 def get_photos_from_database(matricola, nome_prof):
@@ -108,24 +83,19 @@ def get_photos_from_database(matricola, nome_prof):
 
 #inserisce foto nel database e gli altri dati
 def save_photo_in_database(prof_name, numpydata, matricola):
-    print("1")
     current_date = datetime.now()
-    print("2")
     formatted_date_time = current_date.strftime("%Y-%m-%d %H:%M:%S") #es. "2023-07-29 15:30:45"
-    print("7")
     item = [numpydata, matricola, prof_name, formatted_date_time]  #array con i dati che voglio inserire
-    print(numpydata)
+
     cursor.execute('insert into compiti_consegnati values (?,?,?,?);', item) #code_foto, ID_studente, ID_docente, data_e_ora
     connection.commit()  #conferma i dati e li scrive nel database
     
-    cursor.execute("select * from compiti_consegnati")
-    print("2")
-    for row in cursor.fetchall():
-            output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
-            print(output_string)
-            print(row[3])
-            print(len(row))
-    print("3")
+    # cursor.execute("select * from compiti_consegnati")
+    # for row in cursor.fetchall():
+    #         output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
+    #         print(output_string)
+    #         print(row[3])
+    #         print(len(row))
 
 # funzioni utili
 def get_user_id(update: Update):
@@ -157,12 +127,13 @@ async def start_command(update: Update, context: CallbackContext):
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_msg = "Ecco una lista dei *comandi* attualmente disponibili su questo bot:\n\n"\
+    help_msg = "Ecco una lista dei comandi attualmente disponibili su questo bot:\n\n"\
         "- /help: Visualizza questo messaggio\n"\
         "- /lista_docenti: Visualizza l\'elenco dei docenti e ti permette di scegliere a chi inviare le foto del compito, se sei uno studente\n"\
         "- /consegna: Permette il caricamento delle foto della prova scritta per la consegna al docente selezionato in precedenza\n"\
         "- /lista_consegne: Visualizza gli ID degli studenti che hanno effettuato consegne nel giorno corrente\n"\
-        "- /leggi matricola-studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"
+        "- /leggi matricola-studente: Visualizza le foto caricate dagli studenti nel giorno corrente\n"\
+        "- /delete : Permette al docente di eliminare dal database le consegne fatte a lui\n "
     await update.message.reply_text(help_msg)
 
 #solo per studenti
@@ -206,19 +177,31 @@ async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_T
         class_of_user = users_class[user_id]
     else :
         await update.message.reply_text('Autenticati prima')
-    print("a")
     if class_of_user == "Professore":
         nome_prof = users_name[user_id]
-        print("b")
         cursor.execute("select * from compiti_consegnati where ID_docente == ?",(nome_prof,))
-        print("d")
-        for row in cursor.fetchall():
-            output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
-            print(output_string)
-            print(row[3])
-            print(len(row))
-            await update.message.reply(output_string)
-
+        rows = cursor.fetchall()
+        if(rows):
+            for row in rows:
+                output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
+                await update.message.reply_text(output_string)
+            await update.message.reply_text("Premi /leggi e scrivi il numero della matricola per vedere le immagini dello studnete relativo.")
+        else:
+            await update.message.reply_text("Non hai nessun compito da scaricare. Premi /start per ritornare alla pagina inizaiale.")
+    else:
+        await update.message.reply_text('Non puoi eseguire questo comando se sei uno Studente')
+    
+async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
+    user_id = get_user_id(update)
+    if users_class:
+        class_of_user = users_class[user_id]
+    else :
+        await update.message.reply_text('Autenticati prima')
+    if class_of_user == "Professore":
+        nome_prof = users_name[user_id]
+        cursor.execute("delete from compiti_consegnati where ID_docente ==  ?;", (nome_prof,))
+        connection.commit()
+        await update.message.reply_text('Foto eliminate con successo.')
     else:
         await update.message.reply_text('Non puoi eseguire questo comando se sei uno Studente')
     
@@ -233,16 +216,20 @@ async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #so
         args = context.args
         if args:
             matricola_st = args[0]
-            print(matricola_st)
-            message = f"Hai selezionato {matricola_st}"
-            send_photo(matricola_st)  
+            nome_prof = users_name[user_id]
+            foto_date_database = []
+            foto_date_database = get_photos_from_database(matricola_st,nome_prof)
+            if foto_date_database:
+                await update.message.reply_text("Hai selezionato "+ matricola_st)
+                for foto,data in foto_date_database:
+                        await update.message.reply_text("consegnata in data = ",data)
+                        await update.message.reply_photo(photo=foto) 
+            await update.message.reply_text("Scegli tra: \n/start per ritornare alla pagina iniziale. \n/delete per eliminare tutte le consegne che hai ricevuto. \n/leggi e il numero della matricole dello studente del quale si vogliono scaricare le foto.")
         else:
-            message = "Inserisci il numero della matricola corrispondente allo studente del qale si vogliono scaricare le immagini, dopo il comando"
-
-        update.message.reply_text(message)
+            await update.message.reply_text("Inserisci il numero della matricola corrispondente allo studente del quale si vogliono scaricare le immagini, dopo il comando")
+        
     else:
         await update.message.reply_text('Non puoi eseguire questo comando se sei uno Studente')
-    await update.message.reply_text(message)
 
 
 #Funzioni
@@ -250,7 +237,7 @@ async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #so
 # Funzione di gestione del callback dei pulsanti inline
 async def handle_button(update: Update, context: CallbackContext):
     query = update.callback_query
-    user_id = get_user_id(update)#query.from_user.id
+    user_id = get_user_id(update)
     option_selected = query.data
     if option_selected == "Studente" or option_selected == "Professore":
         if not users_pressed_button.get(user_id, False):
@@ -262,7 +249,6 @@ async def handle_button(update: Update, context: CallbackContext):
                 await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Professore. Scrivi il tuo cognome, nome e password.")
             else:
                 await query.answer("Opzione non valida.")
-            # Imposta l'utente come ha premuto il pulsante
             users_pressed_button[user_id] = True
         else:
             await query.answer("Hai già premuto il pulsante. Per modificare la scelta riavvia il bot con /start")
@@ -309,7 +295,7 @@ def handle_response(text: str,update: Update) -> str:
     if class_of_user == "Studente" and users_autentication.get(user_id, True):
         if processed == "fine":
             users_foto[user_id] = "False"
-            return "foto salvate" #termina bot
+            return "foto salvate premi /start per ritonrare all'inizio oppure seleziona un professore a cui inviare le foto" #termina bot
     elif class_of_user == "Professore" and users_autentication.get(user_id, True):
         return "input non accettato"
     return 'sei già autenticato'
@@ -324,32 +310,15 @@ async def handle_image(update: Update, context: CallbackContext):
         users_class[user_id] = "False"
         class_of_user = "False"
         await update.message.reply_text("Non hai il permeso di eseguire questo comando")
-    print(class_of_user == "Studente")
-    print(users_autentication.get(user_id, True))
     
     nome_bool = users_foto[user_id]
     strings = nome_bool.split()
     bool_str = strings[len(strings)-1]
-    print(bool_str)
-    print(bool_str == "True")
-    if class_of_user == "Studente" and users_autentication.get(user_id, True) and bool_str == "True": # cioè è uno studente e si è autenticato e ha inserito il comando 
-        print("5")
+    if class_of_user == "Studente" and users_autentication.get(user_id, True) and bool_str == "True": # cioè è uno studente e si è autenticato e ha inserito il comando
         prof_name = ' '.join( x for x in strings if x not in bool_str)
-        print(prof_name)
         matricola = users_name[user_id]
-        img = await update.message.photo[-1].get_file()
-        path = os.path.join(script_directory, 'image.jpg')
-        print(script_directory)
-        print(path)
-        file_data = await img.download_as_bytearray()
-        # img = Image.open(path)
-        # if os.path.exists(path):
-        #     os.remove(path)
-        # else : 
-        #     print("Nessun file trovato")
-        # numpydata = np.asarray(img)
-        save_photo_in_database(prof_name, file_data,matricola) 
-        print("4")
+        img = update.message.photo[-1].file_id #await
+        save_photo_in_database(prof_name, img ,matricola) 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # informazioni del tipo di messaggio ricevuto
@@ -418,7 +387,7 @@ if __name__ == '__main__':
     
     # Creazione della tabella "compiti_consegnati" nel database con quattro campi: code_foto, ID_studente, ID_docente, data_ora
     tab3 = "create table if not exists compiti_consegnati (" \
-           "code_foto integer primary key not null," \
+           "code_foto text primary key not null," \
            "ID_studente integer not null," \
            "ID_docente varchar(30) not null," \
            "data_e_ora varchar(20) not null);"
@@ -432,6 +401,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('consegna', consegna_command))
     app.add_handler(CommandHandler('lista_consegne', lista_consegne_command))
     app.add_handler(CommandHandler('leggi', leggi_command))
+    app.add_handler(CommandHandler('delete', delete_command))
 
     # Messages
     app.add_handler(MessageHandler(filters.TEXT , handle_message))
