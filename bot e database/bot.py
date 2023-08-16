@@ -9,6 +9,7 @@ import sqlite3
 import os
 from PIL import Image
 import numpy as np
+from datetime import datetime
 
 print('Starting up bot...')
 
@@ -24,16 +25,10 @@ HEADERS : final = {
 # Dizionario per tenere traccia degli utenti che hanno già premuto il pulsante
 users_pressed_button = {}
 users_autentication = {} #dizionario che ci dice se l'utente si è autenticato correttamente
-users_class = [] #ogni elemento della lista è una tupla composta da [user_id, "studente"/"professore"]
+users_class = {} #dizionario user_id e "studente"/"professore"
 users_name = {} #salva il nome dell'user, quindi o la matricola o il cognome e nome del prof 
 prof_names = []
 users_foto = {} # salva quando l'user è uno studente il professore scelto 
-
-def get_class_of_user(id):
-    for id_u,clas in users_class:
-        if id == id_u:
-            return clas
-    return "errore"
 
 #funzione per scaricare la pagina web
 def get_html_content(LINK):
@@ -81,15 +76,16 @@ def autenticazione_prof(nome_prof_fornito, password_fornita):
 
 #funzione per inviare foto del compito nella chat del prof
 async def send_photo(update: Update, matricola):
-    user_id = get_user_id  #CI VANNO LE PARENTESI? tipo get_user_id()
+    user_id = get_user_id(update) 
     nome_prof = users_name[user_id]
-    foto_compito = []
+    foto_date_database = []
     if update.message.text.lower() == "invia foto":
-        foto_compito = get_photos_from_database(matricola,nome_prof)
-        if foto_compito:
-            for foto in foto_compito:
-                # trasforma da numpy in foto se serve 
-                await update.message.reply_photo(photo=foto) #NON HO CAPITO DOVE HAI DEFINITO foto
+        foto_date_database = get_photos_from_database(matricola,nome_prof)
+        if foto_date_database:
+            for foto,data in foto_date_database:
+                foto = Image.fromarray(foto.astype(np.uint8))
+                await update.message.reply_photo(photo=foto) 
+                await update.message.reply_text(data)
                 # chat_id = update.message.chat_id
                 # context.bot.send_photo(chat_id, photo=image)
             '''
@@ -114,10 +110,18 @@ def get_photos_from_database(matricola, nome_prof):
 def save_photo_in_database(prof_name, numpydata, matricola):
     current_date = datetime.now()
     formatted_date_time = current_date.strftime("%Y-%m-%d %H:%M:%S") #es. "2023-07-29 15:30:45"
-    item = [numpydata, matricola, prof_name, formatted_data_time]  #array con i dati che voglio inserire
+    item = [numpydata, matricola, prof_name, formatted_date_time]  #array con i dati che voglio inserire
     cursor.execute('insert into compiti_consegnati values (?,?,?,?);', item) #code_foto, ID_studente, ID_docente, data_e_ora
     connection.commit()  #conferma i dati e li scrive nel database
-    return
+    print("1")
+    cursor.execute("select * from compiti_consegnati")
+    print("2")
+    for row in cursor.fetchall():
+            output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
+            print(output_string)
+            print(row[3])
+            print(len(row))
+    print("3")
 
 # funzioni utili
 def get_user_id(update: Update):
@@ -134,6 +138,7 @@ def random_with_50_percent_probability():
 async def start_command(update: Update, context: CallbackContext):
     user = update.effective_user
     user_id = get_user_id(update)
+    users_class[user_id] = "False"
     users_pressed_button[user_id] = False  # Impostiamo l'utente come non ha ancora premuto il pulsante
     users_autentication[user_id] = False
     users_name[user_id] = "None"
@@ -161,9 +166,10 @@ async def lista_docenti_command(update: Update, context: CallbackContext): #cont
     user_id = get_user_id(update)
     
     if users_class:
-        class_of_user = get_class_of_user(user_id)
+        class_of_user = users_class[user_id]
     else :
-        class_of_user = "non valido"
+        users_class[user_id] = "False"
+        class_of_user = "False"
         await update.message.reply_text("Non hai il permeso di eseguire questo comando")
 
     if class_of_user == "Studente" and users_autentication.get(user_id, True): # cioè è uno studente e si è autenticato
@@ -179,11 +185,13 @@ async def lista_docenti_command(update: Update, context: CallbackContext): #cont
 async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per studenti
     user_id = get_user_id(update)
     if users_class:
-        class_of_user = get_class_of_user(user_id)
+        class_of_user = users_class[user_id]
     else :
         await update.message.reply_text('Autenticati prima')
     if class_of_user == "Studente":
-        users_foto[user_id] = True
+        nome_prof = users_foto[user_id]
+        if nome_prof != "False":
+            users_foto[user_id] = nome_prof + " True"
         await update.message.reply_text('Invia le foto e scrivi \"fine\" per salvarle nel database.')
     else:
         await update.message.reply_text('Non puoi eseguire questo comando se sei un Professore')
@@ -191,15 +199,20 @@ async def consegna_command(update: Update, context: ContextTypes.DEFAULT_TYPE): 
 async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
     user_id = get_user_id(update)
     if users_class:
-        class_of_user = get_class_of_user(user_id)
+        class_of_user = users_class[user_id]
     else :
         await update.message.reply_text('Autenticati prima')
+    print("a")
     if class_of_user == "Professore":
         nome_prof = users_name[user_id]
+        print("b")
         cursor.execute("select * from compiti_consegnati where ID_docente == ?",(nome_prof,))
+        print("d")
         for row in cursor.fetchall():
             output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
-            print(row[0])
+            print(output_string)
+            print(row[3])
+            print(len(row))
             await update.message.reply(output_string)
 
     else:
@@ -209,7 +222,7 @@ async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_T
 async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #solo per prof
     user_id = get_user_id(update)
     if users_class:
-        class_of_user = get_class_of_user(user_id)
+        class_of_user = users_class[user_id]
     else :
         await update.message.reply_text('Autenticati prima')
     if class_of_user == "Professore":
@@ -237,7 +250,7 @@ async def handle_button(update: Update, context: CallbackContext):
     option_selected = query.data
     if option_selected == "Studente" or option_selected == "Professore":
         if not users_pressed_button.get(user_id, False):
-            users_class.append([user_id,option_selected ])
+            users_class[user_id] = option_selected
 
             if option_selected == "Studente":
                 await context.bot.send_message(chat_id=query.message.chat_id, text="Hai selezionato Studente. Scrivi la tua matricola e la password.")
@@ -257,9 +270,10 @@ def handle_response(text: str,update: Update) -> str:
     user_id = get_user_id(update)
     processed: str = text.lower()
     if users_class:
-        class_of_user = get_class_of_user(user_id)
+        class_of_user =users_class[user_id]
     else :
-        class_of_user = "non valido"
+        users_class[user_id] = "False"
+        class_of_user = "False"
         return "Scegli studente o professore"
     strings = text.split()
     if class_of_user == "Studente" and not users_autentication.get(user_id, True):
@@ -268,7 +282,7 @@ def handle_response(text: str,update: Update) -> str:
             if result:
                 users_name[user_id] = strings[0]
                 users_autentication[user_id] = True
-                return "Autenticazione eseguita correttamente"
+                return "Autenticazione eseguita correttamente, per vedere la lista dei professori usa /lista_docenti"
             else:
                 users_autentication[user_id] = False
                 return "Autenticazione rifiutata"
@@ -301,13 +315,23 @@ async def handle_image(update: Update, context: CallbackContext):
     
     
     if users_class:
-        class_of_user = get_class_of_user(user_id)
+        class_of_user =users_class[user_id]
     else :
-        class_of_user = "non valido"
+        users_class[user_id] = "False"
+        class_of_user = "False"
         await update.message.reply_text("Non hai il permeso di eseguire questo comando")
-
-    if class_of_user == "Studente" and users_autentication.get(user_id, True) and not users_foto.get(user_id, "False"): # cioè è uno studente e si è autenticato e ha inserito il comando 
-        prof_name = users_foto[user_id]
+    print(class_of_user == "Studente")
+    print(users_autentication.get(user_id, True))
+    
+    nome_bool = users_foto[user_id]
+    strings = nome_bool.split()
+    bool_str = strings[len(strings)-1]
+    print(bool_str)
+    print(bool_str == "True")
+    if class_of_user == "Studente" and users_autentication.get(user_id, True) and bool_str == "True": # cioè è uno studente e si è autenticato e ha inserito il comando 
+        print("5")
+        prof_name = ' '.join( x for x in strings if x not in bool_str)
+        print(prof_name)
         matricola = users_name[user_id]
         img = update.message.photo[-1].get_file()
         dir = os.path.join(script_directory, 'image.jpg')
@@ -315,6 +339,7 @@ async def handle_image(update: Update, context: CallbackContext):
         img = Image.open(dir)
         numpydata = np.asarray(img)
         save_photo_in_database(prof_name, numpydata,matricola) 
+        print("4")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # informazioni del tipo di messaggio ricevuto
