@@ -12,8 +12,6 @@ print('Starting up bot...')
 
 TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
 BOT_USERNAME : final = "@consegna_compito_unipg_bot"
-#TOKEN : final = "6370580588:AAGKKqCgMAtPduC4Nb63IzwPepFycdkvn8w"
-#BOT_USERNAME : final = "@consegna_compito_bot"
 LINK : final = "https://www.dmi.unipg.it/dipartimento/rubrica?categoria=DOC&lettera=&pagina="
 HEADERS : final = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
@@ -86,13 +84,6 @@ def save_photo_in_database(prof_name, numpydata, matricola):
 
     cursor.execute('insert into compiti_consegnati values (?,?,?,?);', item) #code_foto, ID_studente, ID_docente, data_e_ora
     connection.commit()  #conferma i dati e li scrive nel database
-    
-    # cursor.execute("select * from compiti_consegnati")
-    # for row in cursor.fetchall():
-    #         output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
-    #         print(output_string)
-    #         print(row[3])
-    #         print(len(row))
 
 # funzioni utili
 def get_user_id(update: Update):
@@ -182,9 +173,9 @@ async def lista_consegne_command(update: Update, context: ContextTypes.DEFAULT_T
             for row in rows:
                 output_string = " Lo studente {} ha consegnato al docente {}, in data {}".format( row[1], row[2], row[3])
                 await update.message.reply_text(output_string)
-            await update.message.reply_text("Premi /leggi e scrivi il numero della matricola per vedere le immagini dello studnete relativo.")
+            await update.message.reply_text("Scrivi /leggi seguito dal numero della matricola per vedere le immagini dello studente relativo.")
         else:
-            await update.message.reply_text("Non hai nessun compito da scaricare. Premi /start per ritornare alla pagina inizaiale.")
+            await update.message.reply_text("Non hai nessun compito da scaricare. Premi /start per ritornare alla pagina iniziale.")
     else:
         await update.message.reply_text('Non puoi eseguire questo comando se sei uno Studente')
     
@@ -219,9 +210,9 @@ async def leggi_command(update: Update, context: ContextTypes.DEFAULT_TYPE): #so
             if foto_date_database:
                 await update.message.reply_text("Hai selezionato "+ matricola_st)
                 for foto,data in foto_date_database:
-                        await update.message.reply_text("consegnata in data = ",data)
-                        await update.message.reply_photo(photo=foto) 
-            await update.message.reply_text("Scegli tra: \n/start per ritornare alla pagina iniziale. \n/delete per eliminare tutte le consegne che hai ricevuto. \n/leggi e il numero della matricole dello studente del quale si vogliono scaricare le foto.")
+                        await update.message.reply_text("Consegnato in data = "+ data)
+                        await update.message.reply_photo(photo=foto)            
+            await update.message.reply_text("Scegli tra: \n/start per ritornare alla pagina iniziale. \n/delete per eliminare tutte le consegne che hai ricevuto. \n/leggi seguito dal numero della matricola dello studente del quale si vogliono scaricare le foto.")
         else:
             await update.message.reply_text("Inserisci il numero della matricola corrispondente allo studente del quale si vogliono scaricare le immagini, dopo il comando")
         
@@ -292,7 +283,7 @@ def handle_response(text: str,update: Update) -> str:
     if class_of_user == "Studente" and users_autentication.get(user_id, True):
         if processed == "fine":
             users_foto[user_id] = "False"
-            return "foto salvate premi /start per ritonrare all'inizio oppure seleziona un professore a cui inviare le foto" #termina bot
+            return "foto salvate premi /start per ritornare all'inizio oppure seleziona un professore a cui inviare le foto" #termina bot
     elif class_of_user == "Professore" and users_autentication.get(user_id, True):
         return "input non accettato"
     return 'sei già autenticato'
