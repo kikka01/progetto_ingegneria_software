@@ -10,7 +10,7 @@ from datetime import datetime
 
 print('Starting up bot...')
 
-TOKEN : final = "6669345460:AAFMtWB6HM_Gy-VJkPFaWf_8Lg0lvrcJur8"
+TOKEN : final = *****
 BOT_USERNAME : final = "@consegna_compito_unipg_bot"
 LINK : final = "https://www.dmi.unipg.it/dipartimento/rubrica?categoria=DOC&lettera=&pagina="
 HEADERS : final = {
